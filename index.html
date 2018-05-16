@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=0.5, maximum-scale=0.5, minimum-scale=0.5, user-scalable=no">
+    <meta name="x5-fullscreen" content="true">
+    <meta name="full-screen" content="yes">
+    <meta name="description" content="找您想要的答案，给别人最好的答案">
+    <meta name="keywords" content="答案、对联、诗歌、歇后语、情感答案、知识">
+	<title>答案</title>
+
+	<link rel="stylesheet" type="text/css" href="">
+	<style type="text/css">
+		* {
+		  padding: 0;
+		  margin: 0;
+		}
+		body{
+			background-image: url('./img/bg6.jpg');
+			width: 100%;
+			height: 100vh;
+		}
+		input{
+			outline: none;
+		}
+		button{
+			outline: none;
+		}
+		.content{
+			top: 320px;
+			position: relative;
+			width: 700px;
+			height: auto;
+			margin: 0 auto;
+			vertical-align: middle;
+			/*text-align: center;*/
+		}
+		.input-border{
+			width: 500px;
+			height: 40px;
+			border-radius: 4px;
+		}
+		.btn{
+			width: 100px;
+			height: 43px;
+			border-radius: 6px;
+			background-color: #68C37D; 
+			font-size: 1em;
+			color: #FFFFFF;
+			box-shadow: 5px 5px 2px #888888;
+			outline: none;
+		}
+		.btn-add{
+			width: 60px;
+			line-height: 28px;
+			font-size: 1em;
+			color: #FFFFFF;
+			border-radius: 4px;
+			background-color: #68C37D;
+		}
+		.add-word{
+			line-height: 35px;
+			font-size: 1em;
+			margin-top: 5px;
+		}
+		#get-answer{
+			text-align: right;
+			font-size: 2em;
+			color: #FFFFFF;
+			margin-top: 50px;
+			width: 600px;
+			height: 40px;
+			border: 1px solide #666666;
+			border-radius: 4px;
+		}
+		#answer{
+			margin-top: 20px;
+			display: none;
+		}
+		#push{
+			margin-top: 20px;
+			display: none;
+		}
+	</style>
+	
+</head>
+
+<body>
+	<div class="content">
+		<input class="input-border" type="input" name="issue" id="issue">
+		<input class="btn" type="submit" name="search" id="search" value="搜寻">
+
+		<p id="get-answer"></p>
+		<p class="add-word" style="display: none;">该问题没有您想要的答案^_^。不过，您可以亲手<button class="btn-add" id="add">创建</button>答案。</p>
+
+		<input class="input-border" type="text" name="answer" id="answer">
+		<input class="btn" type="submit" name="push" id="push" value="添加">
+	</div>
+	
+	<script type="text/javascript" src="./js/jquery-3.3.1.min.js"></script>
+	<script type="text/javascript" src="./js/layer/layer.js"></script>
+	<script type="text/javascript" src="./dist/nebulas.js"></script>     
+	<script type="text/javascript" src="./dist/nebPay.js"></script>
+	<script type="text/javascript">
+
+    "use strict";
+
+    var dappAddress = "n1yLEEAPZcR4jrYE1vQEc8njqA3LcgvcWfx";
+    var nebulas = require("nebulas"),
+        Account = nebulas.Account,
+        neb = new nebulas.Neb();
+    neb.setRequest(new nebulas.HttpRequest("https://testnet.nebulas.io"));
+
+    $("#search").click(function(){
+        if (!$("#issue").val()) {
+        	layer.msg('请输入您想知道答案的问题');
+        	return;
+        }
+
+        var from = Account.NewAccount().getAddressString();;
+        var value = "0";
+        var nonce = "0"
+        var gas_price = "1000000"
+        var gas_limit = "2000000"
+        var callFunction = "get";
+        var callArgs = "[\"" + $("#issue").val() + "\"]"; 
+        var contract = {
+            "function": callFunction,
+            "args": callArgs
+        }
+
+        neb.api.call(from,dappAddress,value,nonce,gas_price,gas_limit,contract).then(function (res) {
+            console.log(res)
+            getAnswer(res);
+        }).catch(function (err) {
+            console.log("error:" + err.message)
+        })
+
+    });
+
+    function getAnswer(res){
+    	var result = res.result;
+    	if (result === 'null'){
+            $(".add-word").css("display",'block');
+            $("#get-answer").css("display",'none');
+        } else{
+
+            try{
+                result = JSON.parse(result)
+            }catch (err){
+                console.log("error:" + err.message)
+            }
+
+            if (result.issue){
+	            $(".add-word").css("display",'none');
+	            $("#get-answer").css("display",'block');
+
+            	var answer = result.answer;
+            	$("#get-answer").html(answer);	
+            }
+
+        }
+    }
+
+    // 添加并支付
+    $("#add").click(function() {
+        $(".add-word").css("display",'none');
+        $("#get-answer").css("display",'none');
+        $("#search").css("display",'none');
+        $("#answer").css("display",'block');
+        $("#push").css("display",'block');
+    })
+
+    var NebPay = require("nebpay");
+    var nebPay = new NebPay();
+    var serialNumber
+
+    $("#push").click(function() {
+
+    	var issue = $("#issue").val();
+    	var answer = $("#answer").val();
+    	if(!issue || !answer){
+    		layer.msg('请描述问题，并给出答案。');
+        	return;
+    	}
+
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "save"
+        var callArgs = "[\"" + $("#issue").val() + "\",\"" + $("#answer").val() + "\"]"
+
+        serialNumber = nebPay.call(to, value, callFunction, callArgs, {
+            listener: result
+        });
+    });
+
+    function result(resp) {
+        console.log("response of push: " + JSON.stringify(resp));
+        layer.msg('创建成功');
+        location.reload();
+    }
+
+	</script>     
+</body>
+</html>
